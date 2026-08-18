@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   SITE BACKGROUND
+   ------------------------------------------------------------
+   Right now the site uses a plain background color (set via the
+   "ivory" / "charcoal" Tailwind colors in tailwind.config.ts).
+
+   To use a BACKGROUND IMAGE instead (e.g. a subtle lace texture),
+   uncomment the block below and put your image at
+   /public/backgrounds/site-bg.jpg — then it will show behind
+   the whole site in both light and dark mode.
+   ============================================================ */
+/*
+body {
+  background-image: url("/backgrounds/site-bg.jpg");
+  background-size: cover;
+  background-attachment: fixed;
+  background-position: center;
+}
+*/
+
+@layer base {
+  body {
+    @apply bg-ivory text-ink dark:bg-charcoal dark:text-cream transition-colors duration-300;
+  }
+
+  ::selection {
+    @apply bg-gold/40;
+  }
+
+  /* Visible keyboard focus ring everywhere, for accessibility */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid theme("colors.gold.DEFAULT");
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .font-urdu-mode {
+    font-family: var(--font-urdu), serif;
+  }
+}
+
+/* Respect users who've asked for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

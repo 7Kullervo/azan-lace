@@ -1,0 +1,206 @@
+// ============================================================
+// AZAN LACE — DATABASE SCHEMA (PostgreSQL via Prisma)
+// ------------------------------------------------------------
+// Run `npm run prisma:migrate` after editing this file to
+// create/update the actual database tables.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- USERS ----------
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  COURIER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  phone         String?
+  passwordHash  String
+  role          Role      @default(CUSTOMER)
+  profileImage  String? // path under /public/uploads, set from the customer dashboard
+  language      String    @default("en") // "en" or "ur" — remembers the user's site language
+  createdAt     DateTime  @default(now())
+
+  addresses     Address[]
+  orders        Order[]   @relation("CustomerOrders")
+  courierOrders Order[]   @relation("CourierOrders")
+  reviews       Review[]
+  cart          Cart?
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String // e.g. "Home", "Office"
+  fullName  String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  postalCode String?
+  isDefault Boolean  @default(false)
+}
+
+// ---------- CATALOG ----------
+// "Lace" is the current product type, but the schema is left generic
+// (ProductType) so other product categories can be added later without
+// a schema rewrite — only laces will show the color/unit fields.
+
+enum ProductType {
+  LACE
+  OTHER
+}
+
+enum MeasurementUnit {
+  GUZ // yard — the primary unit for lace, per the store owner's request
+  METER // the other primary unit
+  YARD
+  INCH
+  CENTIMETER
+  ROLL
+  PIECE
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  title       String
+  description String
+  type        ProductType @default(LACE)
+  price       Int // stored in Rupees (whole number, no paisa) — see lib/utils.ts formatPKR()
+  stock       Int         @default(0)
+  thumbnail   String // path under /public/uploads — the one "main" image
+  images      ProductImage[]
+  colors      ProductColor[] // only populated/shown when type = LACE and admin adds colors
+  unit        MeasurementUnit @default(GUZ) // admin picks the unit; guz & meter are primary
+  active      Boolean     @default(true) // admin can hide a product without deleting it
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  reviews     Review[]
+  orderItems  OrderItem[]
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  path      String // path under /public/uploads
+  position  Int     @default(0) // display order in the gallery
+}
+
+model ProductColor {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String // e.g. "Maroon", "Ivory" — admin types the color name
+  hex       String? // optional swatch color for the dropdown, admin can leave blank
+  stock     Int     @default(0) // stock tracked per color
+}
+
+// ---------- CART ----------
+
+model Cart {
+  id     String     @id @default(cuid())
+  userId String     @unique
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items  CartItem[]
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  colorId   String?
+  quantity  Int     @default(1)
+}
+
+// ---------- ORDERS ----------
+
+enum OrderStatus {
+  PENDING
+  BEING_PREPARED
+  PREPARED
+  ON_THE_WAY
+  MIGHT_BE_DELIVERED_TODAY
+  DELIVERED
+  CANCELED
+}
+
+enum PaymentMethod {
+  EASYPAISA
+  COD
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique // human-friendly reference shown to the customer
+  customerId    String
+  customer      User          @relation("CustomerOrders", fields: [customerId], references: [id])
+  courierId     String?
+  courier       User?         @relation("CourierOrders", fields: [courierId], references: [id])
+  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod
+  paid          Boolean       @default(false)
+  subtotal      Int
+  shippingFee   Int           @default(0)
+  total         Int
+  shippingName  String
+  shippingPhone String
+  shippingAddress String
+  shippingCity  String
+  items         OrderItem[]
+  statusHistory OrderStatusEvent[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  colorName  String?
+  quantity   Int
+  unitPrice  Int
+  unit       MeasurementUnit
+}
+
+// Every status change is logged so the customer's "My Orders" timeline
+// and the admin's order history stay accurate and auditable.
+model OrderStatusEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+}
+
+// ---------- REVIEWS ----------
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int // 1-5 stars
+  comment   String
+  createdAt DateTime @default(now())
+}
