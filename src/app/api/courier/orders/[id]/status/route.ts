@@ -11,17 +11,18 @@ const COURIER_ALLOWED_STATUSES = ["ON_THE_WAY", "MIGHT_BE_DELIVERED_TODAY", "DEL
 
 const schema = z.object({ status: z.enum(COURIER_ALLOWED_STATUSES) });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const courier = await getCourierSession();
   if (!courier) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid status for a courier update." }, { status: 400 });
   }
 
-  const existing = await prisma.order.findUnique({ where: { id: params.id } });
+  const existing = await prisma.order.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
   // A courier can only update deliveries assigned to them (admins can update any).
@@ -30,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const order = await prisma.order.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       status: parsed.data.status,
       statusHistory: { create: { status: parsed.data.status, note: "Updated by courier" } },

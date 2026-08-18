@@ -4,9 +4,11 @@ import ProductCard from "@/components/ProductCard";
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: { q?: string };
+  searchParams: Promise<{ q?: string }>;
 }) {
-  const q = searchParams.q?.trim().toLowerCase() ?? "";
+  const resolvedSearchParams = await searchParams;
+  const rawQuery = resolvedSearchParams.q;
+  const q = rawQuery?.trim().toLowerCase() ?? "";
 
   const products = await prisma.product.findMany({
     where: { active: true },
@@ -29,7 +31,7 @@ export default async function ShopPage({
     <div className="mx-auto max-w-7xl px-6 py-12">
       <div className="mb-8">
         <h1 className="font-display text-3xl text-ink dark:text-cream">
-          {q ? `Results for "${searchParams.q}"` : "Shop All Laces"}
+          {q ? `Results for "${rawQuery}"` : "Shop All Laces"}
         </h1>
         {q && (
           <p className="text-sm text-ink-muted dark:text-cream-muted mt-1">

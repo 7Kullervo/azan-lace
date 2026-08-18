@@ -152,11 +152,71 @@ sample products currently use simple placeholder SVGs in that folder; replace th
 with real product photos once the admin panel (Phase 2) is in place, or manually
 via Prisma Studio (`npm run prisma:studio`) in the meantime.
 
-## 6. Deployment notes
+## 7. Deploying for free
 
-- This project stores uploaded images on the local disk (`public/uploads`), which
-  works on a normal server or VPS. If you deploy to a platform with a read-only
-  filesystem (e.g. Vercel's serverless functions), you'll need to switch file
-  storage to a bucket service (S3, Cloudflare R2, Supabase Storage) — the single
-  place that changes is `src/app/api/upload/route.ts`.
-- Set `NEXTAUTH_URL` in `.env` to your real domain once deployed.
+A genuinely $0/month stack: **Render** (app hosting) + **Neon** (Postgres,
+free forever, no expiry) + **Cloudflare R2** (image storage, free up to 10GB).
+
+Worth knowing about the trade-offs before you pick this over a paid host:
+- Render's free web service **sleeps after 15 minutes of no traffic** — the
+  next visitor waits ~30-60 seconds for it to wake up. Fine for a store still
+  being tested; consider Render's $7/mo Starter tier once you have real
+  customers who shouldn't hit that delay.
+- Render's own free Postgres **deletes your data after 30 days** — that's
+  why this guide uses Neon for the database instead, which has no expiry
+  on its free tier.
+- Free hosting has no persistent disk, so product photo uploads must go to
+  Cloudflare R2 instead of local disk — already wired up for you (see
+  `src/app/api/upload/route.ts`); you just need to create the bucket and
+  add its credentials to your environment variables.
+- Skip Vercel for this project specifically — its free Hobby tier's terms
+  restrict it to non-commercial personal projects, and this is a real store.
+
+**Setup steps:**
+1. **Neon** — sign up at neon.tech, create a project, copy the connection
+   string it gives you as your `DATABASE_URL`.
+2. **Cloudflare R2** — sign up at dash.cloudflare.com, go to R2, create a
+   bucket, enable public access for it (R2 > your bucket > Settings >
+   allow public access, or connect a custom domain), then go to
+   "Manage API tokens" and create one with R2 read/write permission. Fill
+   in `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
+   `R2_BUCKET_NAME`, and `R2_PUBLIC_URL` (the public bucket URL R2 shows
+   you) in your environment variables.
+3. **Render** — sign up at render.com (no card needed), New > Web Service,
+   connect your GitHub repo. Build command: `npm install && npm run build`.
+   Start command: `npm run start`. Add all the variables from `.env.example`
+   under Environment, using your real Neon `DATABASE_URL` and R2 values.
+   Set `NEXTAUTH_URL` to the `.onrender.com` URL Render gives you once the
+   first deploy finishes.
+4. Run migrations against the live database once: locally, temporarily set
+   `DATABASE_URL` in your terminal to the Neon connection string and run
+   `npm run prisma:migrate` and `npm run prisma:seed` — this applies
+   directly to the cloud database, no Render-specific step needed.
+
+## 8. Deploying on a paid host (Railway) instead
+
+Railway no longer has an ongoing free tier (a one-time $5 trial credit,
+then $1/month after — not enough to run an app plus a database). If you'd
+rather pay a small amount for no cold starts and no 30-day database
+countdown, Railway remains a good option: create a project, deploy from
+GitHub, add a PostgreSQL service, set the same environment variables as
+above, generate a domain, and run migrations the same way via the Railway
+CLI (`railway run npm run prisma:migrate`).
+
+## 9. Deployment notes
+
+- Set `NEXTAUTH_URL` in `.env` to your real domain once deployed, on
+  whichever host you choose.
+
+## 10. Troubleshooting notes (fixed already, kept for reference)
+
+- **"Prisma has detected that this project was built on Vercel..."** — Vercel
+  caches `node_modules` between builds, which can skip Prisma's client
+  generation step. Fixed by adding `prisma generate` to both the `build`
+  script and a `postinstall` script in `package.json`, so it always runs.
+- **TypeScript errors about `params` on every dynamic route** (e.g.
+  `/product/[slug]`, `/api/admin/orders/[id]/...`) — Next.js 15 changed
+  `params` and `searchParams` from plain objects to `Promise`s that must be
+  awaited. The project is pinned to Next 15+ and every dynamic route/page
+  already uses the new `const { id } = await params` pattern — if you ever
+  add a new dynamic route, follow that same pattern.

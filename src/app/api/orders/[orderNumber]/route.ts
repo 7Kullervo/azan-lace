@@ -3,7 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(_req: NextRequest, { params }: { params: { orderNumber: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ orderNumber: string }> }) {
+  const { orderNumber } = await params;
   const session = await getServerSession(authOptions);
   // @ts-expect-error - id/role added in lib/auth.ts session callback
   const userId = session?.user?.id as string | undefined;
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { orderNumber
   if (!userId) return NextResponse.json({ error: "Not logged in." }, { status: 401 });
 
   const order = await prisma.order.findUnique({
-    where: { orderNumber: params.orderNumber },
+    where: { orderNumber },
     include: {
       items: { include: { product: true } },
       statusHistory: { orderBy: { createdAt: "asc" } },

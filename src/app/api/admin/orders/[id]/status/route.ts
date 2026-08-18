@@ -25,10 +25,11 @@ const schema = z.object({
 // call. Every change is logged to OrderStatusEvent (so the customer's
 // "My Orders" timeline stays accurate) and fires all four notification
 // channels (Email/SMS/WhatsApp/Push) — see src/lib/notifications.ts.
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
@@ -36,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const order = await prisma.order.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       status: parsed.data.status,
       statusHistory: { create: { status: parsed.data.status, note: parsed.data.note } },

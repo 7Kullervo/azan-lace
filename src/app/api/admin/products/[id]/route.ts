@@ -3,12 +3,13 @@ import { getAdminSession } from "@/lib/admin-guard";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   const product = await prisma.product.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { colors: true, images: true },
   });
   if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -34,10 +35,11 @@ const updateSchema = z.object({
   colors: z.array(colorSchema).optional(), // if provided, REPLACES the color list
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
@@ -48,14 +50,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Replacing images/colors is done as delete-then-recreate for simplicity —
   // fine at this catalog size and keeps the admin form logic simple.
   if (data.images) {
-    await prisma.productImage.deleteMany({ where: { productId: params.id } });
+    await prisma.productImage.deleteMany({ where: { productId: id } });
   }
   if (data.colors) {
-    await prisma.productColor.deleteMany({ where: { productId: params.id } });
+    await prisma.productColor.deleteMany({ where: { productId: id } });
   }
 
   const product = await prisma.product.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       ...(data.title ? { title: data.title } : {}),
       ...(data.description ? { description: data.description } : {}),
@@ -77,10 +79,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 // Products are soft-deleted (active: false) rather than removed, so past
 // orders that reference them stay intact.
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminSession();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  await prisma.product.update({ where: { id: params.id }, data: { active: false } });
+  const { id } = await params;
+  await prisma.product.update({ where: { id }, data: { active: false } });
   return NextResponse.json({ ok: true });
 }
