@@ -3,13 +3,14 @@ const nextConfig = {
   // Product images uploaded by the admin are saved under /public/uploads
   // and served statically — no external image host needed.
   images: {
-    // Add your R2 public domain here once you set it up (see .env.example),
-    // e.g. { hostname: "pub-xxxxxxxx.r2.dev" } or your custom domain.
     remotePatterns: [
       { protocol: "https", hostname: "**.r2.dev" },
       { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
+
+      // Cloudinary
+      { protocol: "https", hostname: "res.cloudinary.com" },
     ],
-    dangerouslyAllowSVG: true, // needed for the placeholder SVG product images in /public/uploads
+    dangerouslyAllowSVG: true,
   },
 
   // ============================================================
