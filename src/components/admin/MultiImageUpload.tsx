@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import LaceLoader from "@/components/LaceLoader";
+import { resizeImageForUpload } from "@/lib/image-resize";
 
 export type UploadedImage = { path: string };
 
@@ -28,8 +29,11 @@ export default function MultiImageUpload({
 
     const uploaded: UploadedImage[] = [];
     for (const file of Array.from(fileList)) {
+      // Shrinks large phone-camera photos down before they ever leave the
+      // browser — the single biggest speed-up for slow admin uploads.
+      const optimized = await resizeImageForUpload(file);
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", optimized);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
       if (res.ok) {

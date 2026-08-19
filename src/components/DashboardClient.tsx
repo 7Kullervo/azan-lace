@@ -7,6 +7,7 @@ import { useLanguage } from "@/lib/language-context";
 import { formatPKR, STATUS_LABELS } from "@/lib/utils";
 import LaceLoader from "@/components/LaceLoader";
 import AddressBook from "@/components/AddressBook";
+import { resizeImageForUpload } from "@/lib/image-resize";
 
 type Profile = {
   id: string;
@@ -53,8 +54,9 @@ export default function DashboardClient() {
     if (!file) return;
 
     setUploading(true);
+    const optimized = await resizeImageForUpload(file, 800); // profile pictures don't need to be large
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", optimized);
 
     const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
     const uploadData = await uploadRes.json();
