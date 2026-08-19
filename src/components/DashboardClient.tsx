@@ -7,7 +7,8 @@ import { useLanguage } from "@/lib/language-context";
 import { formatPKR, STATUS_LABELS } from "@/lib/utils";
 import LaceLoader from "@/components/LaceLoader";
 import AddressBook from "@/components/AddressBook";
-import { resizeImageForUpload } from "@/lib/image-resize";
+import { resizeImageForUpload, UnsupportedImageError } from "@/lib/image-resize";
+import { safeJson } from "@/lib/safe-json";
 
 type Profile = {
   id: string;
@@ -33,6 +34,7 @@ export default function DashboardClient() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [phone, setPhone] = useState("");
   const [savedMsg, setSavedMsg] = useState(false);
@@ -54,23 +56,36 @@ export default function DashboardClient() {
     if (!file) return;
 
     setUploading(true);
-    const optimized = await resizeImageForUpload(file, 800); // profile pictures don't need to be large
-    const formData = new FormData();
-    formData.append("file", optimized);
+    setUploadError(null);
 
-    const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-    const uploadData = await uploadRes.json();
+    try {
+      const optimized = await resizeImageForUpload(file, 800); // profile pictures don't need to be large
+      const formData = new FormData();
+      formData.append("file", optimized);
 
-    if (uploadRes.ok) {
-      const updateRes = await fetch("/api/user/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileImage: uploadData.path }),
-      });
-      const updated = await updateRes.json();
-      setProfile(updated);
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      const { ok, data, rawError } = await safeJson<{ path: string; error?: string }>(uploadRes);
+
+      if (ok && data) {
+        const updateRes = await fetch("/api/user/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileImage: data.path }),
+        });
+        const updated = await updateRes.json();
+        setProfile(updated);
+      } else {
+        setUploadError(data?.error || rawError || "Could not upload that photo.");
+      }
+    } catch (err) {
+      setUploadError(
+        err instanceof UnsupportedImageError
+          ? err.message
+          : "Something went wrong preparing that image. Please try a different photo."
+      );
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   }
 
   async function handleSaveDetails(e: React.FormEvent) {
@@ -135,6 +150,9 @@ export default function DashboardClient() {
             >
               Change photo
             </button>
+            {uploadError && (
+              <p className="mt-2 text-xs text-red-600 text-left">{uploadError}</p>
+            )}
 
             <h2 className="mt-4 font-body font-semibold text-ink dark:text-cream">{profile.name}</h2>
             <p className="text-sm text-ink-muted dark:text-cream-muted">{profile.email}</p>

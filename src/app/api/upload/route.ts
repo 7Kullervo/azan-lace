@@ -72,9 +72,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only JPG, PNG, WEBP, or GIF images are allowed." }, { status: 400 });
   }
 
-  const maxSizeBytes = 5 * 1024 * 1024; // 5MB
+  // Kept comfortably under common hosting-platform request body caps (e.g.
+  // Vercel's serverless functions reject bodies over ~4.5MB with a raw,
+  // non-JSON error) — with client-side compression in place, a normal
+  // photo should never get close to this anyway.
+  const maxSizeBytes = 4 * 1024 * 1024; // 4MB
   if (file.size > maxSizeBytes) {
-    return NextResponse.json({ error: "Image must be under 5MB." }, { status: 400 });
+    return NextResponse.json({ error: "Image must be under 4MB. Try a smaller photo, or crop/compress it first." }, { status: 400 });
   }
 
   const ext = file.name.split(".").pop() || "jpg";

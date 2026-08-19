@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import LaceLoader from "@/components/LaceLoader";
-import { resizeImageForUpload } from "@/lib/image-resize";
+import { resizeImageForUpload, UnsupportedImageError } from "@/lib/image-resize";
+import { safeJson } from "@/lib/safe-json";
 
 export type UploadedImage = { path: string };
 
@@ -29,17 +30,27 @@ export default function MultiImageUpload({
 
     const uploaded: UploadedImage[] = [];
     for (const file of Array.from(fileList)) {
-      // Shrinks large phone-camera photos down before they ever leave the
-      // browser — the single biggest speed-up for slow admin uploads.
-      const optimized = await resizeImageForUpload(file);
-      const formData = new FormData();
-      formData.append("file", optimized);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      if (res.ok) {
-        uploaded.push({ path: data.path });
-      } else {
-        setError(data.error || "One or more images failed to upload.");
+      try {
+        // Shrinks large phone-camera photos down before they ever leave the
+        // browser — the single biggest speed-up for slow admin uploads, and
+        // converts iPhone HEIC photos to JPEG since browsers can't display them.
+        const optimized = await resizeImageForUpload(file);
+        const formData = new FormData();
+        formData.append("file", optimized);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const { ok, data, rawError } = await safeJson<{ path: string; error?: string }>(res);
+
+        if (ok && data) {
+          uploaded.push({ path: data.path });
+        } else {
+          setError(data?.error || rawError || "One or more images failed to upload.");
+        }
+      } catch (err) {
+        if (err instanceof UnsupportedImageError) {
+          setError(err.message);
+        } else {
+          setError("Something went wrong preparing that image. Please try a different photo.");
+        }
       }
     }
 
