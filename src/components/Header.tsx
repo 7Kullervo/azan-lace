@@ -12,8 +12,12 @@ import SearchBar from "@/components/SearchBar";
 export default function Header() {
   const { data: session } = useSession();
   const { itemCount } = useCart();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Labels for the About / Contact links, in English or Urdu.
+  const aboutLabel = language === "ur" ? "ہمارے بارے میں" : "About Us";
+  const contactLabel = language === "ur" ? "رابطہ کریں" : "Contact Us";
 
   return (
     <header className="sticky top-0 z-40 border-b border-wine/10 dark:border-gold/10 bg-ivory/90 dark:bg-charcoal/90 backdrop-blur-sm transition-colors duration-300">
@@ -32,6 +36,12 @@ export default function Header() {
           </Link>
           <Link href="/shop" className="hover:text-wine dark:hover:text-gold transition-colors">
             {t("shop")}
+          </Link>
+          <Link href="/about" className="hover:text-wine dark:hover:text-gold transition-colors">
+            {aboutLabel}
+          </Link>
+          <Link href="/contact" className="hover:text-wine dark:hover:text-gold transition-colors">
+            {contactLabel}
           </Link>
         </nav>
 
@@ -120,6 +130,14 @@ export default function Header() {
       <div className="px-4 pb-3 sm:hidden">
         <SearchBar />
       </div>
+
+      {/* Phone-only link row (the main nav above is hidden on small screens) */}
+      <nav className="flex items-center justify-center gap-5 px-4 pb-3 text-sm text-ink dark:text-cream md:hidden">
+        <Link href="/" className="hover:text-wine dark:hover:text-gold">{t("home")}</Link>
+        <Link href="/shop" className="hover:text-wine dark:hover:text-gold">{t("shop")}</Link>
+        <Link href="/about" className="hover:text-wine dark:hover:text-gold">{aboutLabel}</Link>
+        <Link href="/contact" className="hover:text-wine dark:hover:text-gold">{contactLabel}</Link>
+      </nav>
     </header>
   );
 }
